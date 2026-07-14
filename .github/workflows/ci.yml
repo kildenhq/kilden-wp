@@ -44,7 +44,7 @@ jobs:
       - name: composer install (path repo points at the sibling checkout)
         run: |
           composer config repositories.0 '{"type":"path","url":"kilden-sdk-php","options":{"symlink":true}}'
-          composer install --no-interaction
+          composer update --no-interaction --no-progress
       - name: vendored core is reproducible
         run: |
           php bin/build-vendor.php kilden-sdk-php
