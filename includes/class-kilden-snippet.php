@@ -86,7 +86,7 @@ JS;
             $init = sprintf(
                 'kilden.init(%s%s);',
                 wp_json_encode($write_key),
-                $init_options === array() ? '' : ', ' . wp_json_encode($init_options)
+                $init_options === array() ? '' : ', ' . wp_json_encode($init_options, JSON_UNESCAPED_SLASHES)
             );
 
             return "function kildenBoot() {\n" . $loader . "\n  " . $init . "\n}";
@@ -106,8 +106,10 @@ JS;
     private static function identity_js(array $init_options): string
     {
         $write_key = wp_json_encode(Kilden_Settings::public_key());
-        $endpoint = wp_json_encode(esc_url_raw(rest_url('kilden/v1/identity')));
-        $options = wp_json_encode($init_options);
+        $endpoint = wp_json_encode(esc_url_raw(rest_url('kilden/v1/identity')), JSON_UNESCAPED_SLASHES);
+        // An empty PHP array would encode as a JS Array; init options must
+        // always be a plain object.
+        $options = $init_options === array() ? '{}' : wp_json_encode($init_options, JSON_UNESCAPED_SLASHES);
 
         return <<<JS
   var kildenIdentityUrl = {$endpoint};

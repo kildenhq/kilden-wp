@@ -22,6 +22,17 @@ class Kilden_Client_Factory
 
     public static function client(): ?Client
     {
+        /**
+         * Short-circuit for tests and exotic setups: return a pre-built
+         * client (e.g. with a custom transport) and the factory steps aside.
+         *
+         * @param Client|null $client
+         */
+        $prebuilt = apply_filters('kilden_pre_client', null);
+        if ($prebuilt instanceof Client) {
+            return $prebuilt;
+        }
+
         if (self::$client !== null || self::$client_failed) {
             return self::$client;
         }

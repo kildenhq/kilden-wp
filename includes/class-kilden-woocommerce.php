@@ -176,7 +176,11 @@ class Kilden_WooCommerce
         }
     }
 
-    /** Blocks checkout: the id arrives earlier via the session bridge. */
+    /**
+     * Blocks checkout: the id arrives earlier via the session bridge.
+     *
+     * @param WC_Order $order
+     */
     public static function persist_distinct_id_blocks($order): void
     {
         if ((string) $order->get_meta(self::META_DISTINCT_ID) !== '') {
