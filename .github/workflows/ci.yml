@@ -1,0 +1,57 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: ["7.4", "8.0", "8.3"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+      - name: php -l
+        run: |
+          find . -name '*.php' -not -path './vendor/*' -print0 \
+            | xargs -0 -n1 php -l > /dev/null
+          echo "lint clean"
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: freshworkstudio/kilden-sdk-spec
+          path: spec
+      - uses: actions/checkout@v4
+        with:
+          repository: freshworkstudio/kilden-sdk-php
+          path: kilden-sdk-php
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache-dependency-path: spec/mockserver/go.mod
+      - name: composer install (path repo points at the sibling checkout)
+        run: |
+          composer config repositories.0 '{"type":"path","url":"kilden-sdk-php","options":{"symlink":true}}'
+          composer install --no-interaction
+      - name: vendored core is reproducible
+        run: |
+          php bin/build-vendor.php kilden-sdk-php
+          git diff --exit-code includes/vendor-kilden
+      - name: start mock capture server
+        run: |
+          (cd spec/mockserver && go run . -addr :8096) &
+          for i in $(seq 1 30); do curl -sf localhost:8096/healthz && break || sleep 1; done
+      - run: KILDEN_MOCK_URL=http://127.0.0.1:8096 vendor/bin/phpunit
+      - run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
