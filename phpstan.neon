@@ -1,0 +1,24 @@
+includes:
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+    level: 6
+    phpVersion: 70400
+    paths:
+        - includes
+        - kilden.php
+        - uninstall.php
+        - bin
+    excludePaths:
+        - includes/vendor-kilden (?)
+    scanDirectories:
+        - includes/vendor-kilden/src
+    scanFiles:
+        - tests/phpstan-woocommerce-stubs.php
+    bootstrapFiles:
+        - includes/vendor-kilden/autoload.php
+    treatPhpDocTypesAsCertain: false
+    ignoreErrors:
+        # WooCommerce classes are runtime-optional by design.
+        - '#unknown class (WC_|WooCommerce)#'
+        - '#invalid type WC_#'
