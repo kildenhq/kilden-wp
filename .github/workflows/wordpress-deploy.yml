@@ -1,0 +1,32 @@
+# Deploys the plugin to the wordpress.org SVN repository.
+#
+# DISABLED ON PURPOSE (workflow_dispatch only, and the job is additionally
+# gated): the wordpress.org submission has not happened yet — it is a manual
+# human step with weeks of review. Once the plugin is approved and the
+# `kilden` slug exists in SVN:
+#
+#   1. Add SVN_USERNAME and SVN_PASSWORD as repo secrets.
+#   2. Change the `if:` below to `true`.
+#   3. Trigger on tag pushes (uncomment the `push:` block) or dispatch it
+#      manually per release.
+#
+# The 10up action mirrors the git tag into SVN trunk + tags/<version> and
+# honors .distignore for what ships.
+name: wordpress.org deploy
+
+on:
+  workflow_dispatch:
+  # push:
+  #   tags: ["v*"]
+
+jobs:
+  deploy:
+    if: ${{ false }}  # flip after wordpress.org approval — see header comment
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: 10up/action-wordpress-plugin-deploy@stable
+        env:
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+          SLUG: kilden
