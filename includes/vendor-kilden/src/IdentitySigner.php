@@ -8,7 +8,7 @@ use InvalidArgumentException;
 
 /**
  * Signs the short-lived identity tokens Kilden's trust model runs on
- * (docs.kilden.io/identity-verification). Deliberately separate from Client:
+ * (kilden.io/docs/identity-verification). Deliberately separate from Client:
  * a page-rendering controller wants a token, not an event queue.
  *
  * The output is byte-frozen across every Kilden server SDK (spec §6.1) —

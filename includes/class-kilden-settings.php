@@ -166,7 +166,7 @@ class Kilden_Settings
             <h1><?php esc_html_e('Kilden', 'kilden'); ?></h1>
             <p>
                 <?php esc_html_e('Connect your store to Kilden. Find both keys and the identity secret in your Kilden project settings.', 'kilden'); ?>
-                <a href="https://docs.kilden.io" target="_blank" rel="noreferrer">docs.kilden.io</a>
+                <a href="https://kilden.io/docs" target="_blank" rel="noreferrer">kilden.io/docs</a>
             </p>
             <form method="post" action="options.php">
                 <?php settings_fields('kilden'); ?>

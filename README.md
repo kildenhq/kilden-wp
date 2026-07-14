@@ -77,7 +77,7 @@ plugin's event delivery is the PHP SDK, verbatim.
 ## Community
 
 - [Discussions](https://github.com/kildenhq/kilden-wp/discussions)
-- [docs.kilden.io](https://docs.kilden.io)
+- [kilden.io/docs](https://kilden.io/docs)
 
 ## License
 
