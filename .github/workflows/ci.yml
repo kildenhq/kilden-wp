@@ -41,9 +41,9 @@ jobs:
         with:
           go-version: "1.24"
           cache-dependency-path: spec/mockserver/go.mod
-      - name: composer install (path repo points at the sibling checkout)
+      - name: composer install (path repo points at the in-workspace checkout)
         run: |
-          composer config repositories.0 '{"type":"path","url":"kilden-sdk-php","options":{"symlink":true}}'
+          sed -i 's|"../kilden-sdk-php"|"kilden-sdk-php"|' composer.json
           composer update --no-interaction --no-progress
       - name: vendored core is reproducible
         run: |
