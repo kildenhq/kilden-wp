@@ -4,7 +4,7 @@
 
 # Kilden for WordPress & WooCommerce
 
-[![ci](https://github.com/freshworkstudio/kilden-wp/actions/workflows/ci.yml/badge.svg)](https://github.com/freshworkstudio/kilden-wp/actions/workflows/ci.yml)
+[![ci](https://github.com/kildenhq/kilden-wp/actions/workflows/ci.yml/badge.svg)](https://github.com/kildenhq/kilden-wp/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-GPLv2%2B-blue)](LICENSE)
 
 Connect your WordPress site or WooCommerce store to [Kilden](https://kilden.io)
@@ -34,7 +34,7 @@ work properly:
 ## Installation
 
 Grab the latest release zip from
-[Releases](https://github.com/freshworkstudio/kilden-wp/releases), upload it
+[Releases](https://github.com/kildenhq/kilden-wp/releases), upload it
 in *Plugins → Add New → Upload*, then enter your keys in *Settings → Kilden*.
 Setup details, including the wp-config.php constants for keeping secrets out
 of the database, are in [readme.txt](readme.txt) — the same document that
@@ -53,7 +53,7 @@ will ship on wordpress.org.
 
 ## For developers
 
-The plugin embeds the [Kilden PHP SDK](https://github.com/freshworkstudio/kilden-sdk-php)
+The plugin embeds the [Kilden PHP SDK](https://github.com/kildenhq/kilden-sdk-php)
 under a prefixed namespace (`KildenWP\Vendor\Kilden`) so it can never collide
 with another plugin shipping the same library; `bin/build-vendor.php`
 regenerates the vendored copy. HTTP goes through `wp_remote_post()` — the
@@ -71,12 +71,12 @@ php bin/build-vendor.php  # re-vendor the core from ../kilden-sdk-php
 ```
 
 Behavior questions end at the
-[server SDK spec](https://github.com/freshworkstudio/kilden-sdk-spec); the
+[server SDK spec](https://github.com/kildenhq/kilden-sdk-spec); the
 plugin's event delivery is the PHP SDK, verbatim.
 
 ## Community
 
-- [Discussions](https://github.com/freshworkstudio/kilden-wp/discussions)
+- [Discussions](https://github.com/kildenhq/kilden-wp/discussions)
 - [docs.kilden.io](https://docs.kilden.io)
 
 ## License

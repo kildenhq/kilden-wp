@@ -24,5 +24,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a prefixed namespace.
 - `KILDEN_SECRET_KEY` / `KILDEN_IDENTITY_SECRET` wp-config.php constants.
 
-[Unreleased]: https://github.com/freshworkstudio/kilden-wp/compare/v0.1.0-alpha.1...HEAD
-[0.1.0-alpha.1]: https://github.com/freshworkstudio/kilden-wp/releases/tag/v0.1.0-alpha.1
+[Unreleased]: https://github.com/kildenhq/kilden-wp/compare/v0.1.0-alpha.1...HEAD
+[0.1.0-alpha.1]: https://github.com/kildenhq/kilden-wp/releases/tag/v0.1.0-alpha.1

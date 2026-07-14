@@ -2,9 +2,9 @@
 
 Event delivery behavior (batching, retries, payloads, identity signing) is
 not decided in this repo: the plugin embeds the
-[Kilden PHP SDK](https://github.com/freshworkstudio/kilden-sdk-php), whose
+[Kilden PHP SDK](https://github.com/kildenhq/kilden-sdk-php), whose
 behavior is governed by
-[kilden-sdk-spec](https://github.com/freshworkstudio/kilden-sdk-spec). A PR
+[kilden-sdk-spec](https://github.com/kildenhq/kilden-sdk-spec). A PR
 here that changes delivery behavior without a spec change is rejected;
 WordPress-specific behavior (hooks, settings, WooCommerce mapping, consent)
 is decided here.
@@ -30,5 +30,5 @@ KILDEN_MOCK_URL=http://127.0.0.1:8096 composer test
 
 ## Questions
 
-[Discussions](https://github.com/freshworkstudio/kilden-wp/discussions) —
+[Discussions](https://github.com/kildenhq/kilden-wp/discussions) —
 answers there stay searchable.

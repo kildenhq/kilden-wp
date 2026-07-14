@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Kilden
- * Plugin URI: https://github.com/freshworkstudio/kilden-wp
+ * Plugin URI: https://github.com/kildenhq/kilden-wp
  * Description: Kilden analytics for WordPress and WooCommerce — page analytics, verified identity and server-side revenue tracking that survives page caching.
  * Version: 0.1.0-alpha.1
  * Requires at least: 6.0
