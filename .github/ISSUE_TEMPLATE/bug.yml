@@ -1,0 +1,22 @@
+name: Bug report
+description: Something in the plugin misbehaves on your site
+labels: [bug]
+body:
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      placeholder: "WordPress 6.8, WooCommerce 9.x, PHP 8.2, plugin 0.1.0"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Include the caching plugin/CDN and consent plugin if the issue involves tracking or identity.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected

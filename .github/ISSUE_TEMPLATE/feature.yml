@@ -1,0 +1,11 @@
+name: Feature request
+description: Propose an improvement to the WordPress or WooCommerce integration
+labels: [enhancement]
+body:
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Event-delivery behavior belongs in kilden-sdk-spec; WordPress and WooCommerce behavior belongs here.
+    validations:
+      required: true
