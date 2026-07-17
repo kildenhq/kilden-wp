@@ -3,7 +3,7 @@
  * Plugin Name: Kilden
  * Plugin URI: https://github.com/kildenhq/kilden-wp
  * Description: Kilden analytics for WordPress and WooCommerce — page analytics, verified identity and server-side revenue tracking that survives page caching.
- * Version: 0.1.0-alpha.1
+ * Version: 0.1.0-alpha.2
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: Kilden
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('KILDEN_WP_VERSION', '0.1.0-alpha.1');
+define('KILDEN_WP_VERSION', '0.1.0-alpha.2');
 define('KILDEN_WP_FILE', __FILE__);
 define('KILDEN_WP_DIR', plugin_dir_path(__FILE__));
 
