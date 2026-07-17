@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-07-17
+
+First release exercised end to end against a real WordPress + WooCommerce
+install and Kilden's production ingest, rather than against the spec's mock:
+browsing, checkout (both the blocks and the classic one, as guest and as a
+signed-in customer), revenue, refunds, identity and consent.
+
+### Fixed
+
+- Consent gating, which had switched Kilden off entirely wherever a WP Consent
+  API plugin was installed. The gate asked `wp_has_consent()` from the snippet
+  — the first script on the page, while the consent API's own script is dozens
+  further down — so every visitor read as unconsented and it waited for a
+  change that never comes for someone who had already consented. It asks again
+  once that script has run.
+
 ## [0.1.0-alpha.3] - 2026-07-17
 
 ### Fixed
@@ -68,7 +84,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a prefixed namespace.
 - `KILDEN_SECRET_KEY` / `KILDEN_IDENTITY_SECRET` wp-config.php constants.
 
-[Unreleased]: https://github.com/kildenhq/kilden-wp/compare/v0.1.0-alpha.3...HEAD
+[Unreleased]: https://github.com/kildenhq/kilden-wp/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/kildenhq/kilden-wp/compare/v0.1.0-alpha.3...v0.1.0
 [0.1.0-alpha.3]: https://github.com/kildenhq/kilden-wp/compare/v0.1.0-alpha.2...v0.1.0-alpha.3
 [0.1.0-alpha.2]: https://github.com/kildenhq/kilden-wp/compare/v0.1.0-alpha.1...v0.1.0-alpha.2
 [0.1.0-alpha.1]: https://github.com/kildenhq/kilden-wp/releases/tag/v0.1.0-alpha.1
