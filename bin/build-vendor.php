@@ -43,9 +43,12 @@ foreach ($files as $file) {
 
     $code = preg_replace('/^namespace Kilden(\\\\[^;]+)?;/m', 'namespace KildenWP\\Vendor\\Kilden$1;', $code);
     $code = preg_replace('/^use Kilden\\\\/m', 'use KildenWP\\Vendor\\Kilden\\', $code);
-    // Fully-qualified references in code (rare but possible); the negative
-    // lookbehind keeps the rewrite idempotent on already-prefixed lines.
-    $code = preg_replace('/(?<!Vendor)\\\\Kilden\\\\(Transport|Internal|FeatureFlags)\\\\/', '\\\\KildenWP\\\\Vendor\\\\Kilden\\\\$1\\\\', $code);
+    // Fully-qualified references in code; the negative lookbehind keeps the
+    // rewrite idempotent on already-prefixed lines. This deliberately matches
+    // ANY `\Kilden\…` rather than an allow-list of sub-namespaces: an earlier
+    // version listed only Transport|Internal|FeatureFlags and silently left
+    // `\Kilden\Client::VERSION` in Sender behind, which fatals on every send.
+    $code = preg_replace('/(?<!Vendor)\\\\Kilden\\\\/', '\\\\KildenWP\\\\Vendor\\\\Kilden\\\\', $code);
 
     $dest = $target . '/src/' . $relative;
     if (!is_dir(dirname($dest))) {
@@ -82,5 +85,31 @@ spl_autoload_register(static function (\$class) use (\$kilden_wp_classmap) {
 });
 
 PHP);
+
+// Verify the rewrite instead of trusting it. A leftover `Kilden\…` resolves
+// fine wherever the unprefixed core is also loaded — which includes this
+// repo's own test suite, since Composer installs it as a dev dependency — so
+// the only place a miss shows up is a real WordPress install, at runtime, as
+// a fatal. Fail the build here instead.
+$leftovers = array();
+$written = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($target . '/src', FilesystemIterator::SKIP_DOTS));
+foreach ($written as $file) {
+    if ($file->getExtension() !== 'php') {
+        continue;
+    }
+    $file = $file->getPathname();
+    foreach (file($file, FILE_IGNORE_NEW_LINES) as $i => $line) {
+        if (preg_match('/^namespace Kilden[;\\\\]/', $line)
+            || preg_match('/^use Kilden\\\\/', $line)
+            || preg_match('/(?<!Vendor)\\\\Kilden\\\\/', $line)) {
+            $leftovers[] = substr($file, strlen($target) + 1) . ':' . ($i + 1) . '  ' . trim($line);
+        }
+    }
+}
+
+if ($leftovers !== array()) {
+    fwrite(STDERR, "unprefixed references survived the rewrite:\n  " . implode("\n  ", $leftovers) . "\n");
+    exit(1);
+}
 
 echo 'vendored ' . count($classmap) . " classes from {$sourceSrc}\n";

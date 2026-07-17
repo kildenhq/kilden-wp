@@ -81,7 +81,7 @@ final class Sender
 
         $headers = [
             'Content-Type' => 'application/json',
-            'User-Agent' => 'kilden-php/' . \Kilden\Client::VERSION,
+            'User-Agent' => 'kilden-php/' . \KildenWP\Vendor\Kilden\Client::VERSION,
         ];
         $body = $payload;
         if (strlen($payload) > self::GZIP_THRESHOLD_BYTES && function_exists('gzencode')) {

@@ -27,7 +27,7 @@ use Throwable;
  */
 final class Client
 {
-    public const VERSION = '0.1.0-alpha.2';
+    public const VERSION = '0.1.0-alpha.5';
 
     private const MAX_BATCH_EVENTS = 1000;
     private const MAX_EVENT_BYTES = 200;
