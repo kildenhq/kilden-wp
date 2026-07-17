@@ -51,7 +51,24 @@ class Kilden_Identity
     {
         nocache_headers();
 
-        $user = wp_get_current_user();
+        // Read the login cookie ourselves rather than asking for the current
+        // user. On a REST request WordPress ignores that cookie unless an
+        // X-WP-Nonce comes with it (rest_cookie_check_errors calls
+        // wp_set_current_user(0)), so wp_get_current_user() is nobody here
+        // even for a signed-in visitor — this endpoint answered 204 to every
+        // one of them, so no token was ever minted and no browser event was
+        // ever verified.
+        //
+        // Sending a nonce is not an option: it is per-user and per-session,
+        // and this whole endpoint exists because the page HTML is cached and
+        // shared. wp_validate_auth_cookie checks the cookie's own HMAC, so a
+        // missing, expired or forged one resolves to nobody. What is given up
+        // is nonce CSRF protection, which this read does not need: a
+        // cross-origin caller can make the browser send the cookie but cannot
+        // read the response, and the token only ever vouches for the caller's
+        // own session.
+        $user_id = (int) wp_validate_auth_cookie('', 'logged_in');
+        $user = $user_id > 0 ? get_user_by('id', $user_id) : null;
         if (!$user || 0 === (int) $user->ID) {
             $response = new WP_REST_Response(null, 204);
         } else {

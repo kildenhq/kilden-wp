@@ -16,7 +16,7 @@ final class IdentityTest extends TestCase
 
     public function testAnonymousVisitorGets204(): void
     {
-        $GLOBALS['kilden_test']['current_user'] = null;
+        $GLOBALS['kilden_test']['login_cookie_user'] = null;
 
         $response = Kilden_Identity::handle(null);
 
@@ -25,9 +25,41 @@ final class IdentityTest extends TestCase
         self::assertStringContainsString('no-store', $response->headers['Cache-Control']);
     }
 
+    public function testAForgedOrExpiredCookieIsAnonymous(): void
+    {
+        // wp_validate_auth_cookie checks the cookie's HMAC, so a forged one
+        // resolves to nobody — the same answer as no cookie at all.
+        $GLOBALS['kilden_test']['login_cookie_user'] = null;
+        $GLOBALS['kilden_test']['current_user'] = new WP_User(42, 'user@example.com', 'Test User');
+
+        $response = Kilden_Identity::handle(null);
+
+        self::assertSame(204, $response->status);
+    }
+
+    public function testTheRestContextHasNoCurrentUserOnlyACookie(): void
+    {
+        // The bug this endpoint shipped with. WordPress ignores the login
+        // cookie on a REST request unless an X-WP-Nonce comes with it, so
+        // wp_get_current_user() is nobody there — while the cookie itself is
+        // perfectly valid. Reading the current user meant answering 204 to
+        // every logged-in visitor, so no identity token was ever minted and
+        // no browser event was ever verified.
+        //
+        // A nonce is not the fix: it is per-user and per-session, and this
+        // snippet renders into pages a cache serves to everyone.
+        $GLOBALS['kilden_test']['current_user'] = null;
+        $GLOBALS['kilden_test']['login_cookie_user'] = new WP_User(42, 'user@example.com', 'Test User');
+
+        $response = Kilden_Identity::handle(null);
+
+        self::assertSame(200, $response->status);
+        self::assertSame('42', $response->data['distinct_id']);
+    }
+
     public function testLoggedInVisitorGetsSignedIdentity(): void
     {
-        $GLOBALS['kilden_test']['current_user'] = new WP_User(42, 'user@example.com', 'Test User');
+        $GLOBALS['kilden_test']['login_cookie_user'] = new WP_User(42, 'user@example.com', 'Test User');
 
         $response = Kilden_Identity::handle(null);
 
@@ -52,7 +84,7 @@ final class IdentityTest extends TestCase
 
     public function testTraitsAndDistinctIdAreFilterable(): void
     {
-        $GLOBALS['kilden_test']['current_user'] = new WP_User(42, 'user@example.com', 'Test User');
+        $GLOBALS['kilden_test']['login_cookie_user'] = new WP_User(42, 'user@example.com', 'Test User');
         add_filter('kilden_distinct_id_for_user', static function ($id, $user) {
             return 'customer_' . $id;
         });
@@ -75,7 +107,7 @@ final class IdentityTest extends TestCase
 
         self::assertFalse(Kilden_Identity::active());
 
-        $GLOBALS['kilden_test']['current_user'] = new WP_User(42);
+        $GLOBALS['kilden_test']['login_cookie_user'] = new WP_User(42);
         $response = Kilden_Identity::handle(null);
         self::assertSame(204, $response->status);
     }

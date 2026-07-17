@@ -20,6 +20,7 @@ $GLOBALS['kilden_test'] = array(
     'remote_posts' => array(),
     'remote_response' => null,
     'current_user' => null,
+    'login_cookie_user' => null,
     'rest_routes'  => array(),
     'nocache_calls' => 0,
     'wc'           => null,
@@ -35,6 +36,7 @@ function kilden_test_reset(): void
         'remote_posts' => array(),
         'remote_response' => null,
         'current_user' => null,
+        'login_cookie_user' => null,
         'rest_routes'  => array(),
         'nocache_calls' => 0,
         'wc'           => new Kilden_Fake_WC(),
@@ -139,13 +141,38 @@ function register_rest_route($ns, $route, $args)
     $GLOBALS['kilden_test']['rest_routes'][$ns . $route] = $args;
 }
 
+/**
+ * In a REST request WordPress deliberately ignores the login cookie unless an
+ * X-WP-Nonce accompanies it (rest_cookie_check_errors calls
+ * wp_set_current_user(0)), so this returns nothing for the identity endpoint's
+ * context. That is not pedantry: the endpoint used to call this and answered
+ * 204 to every logged-in visitor for it, in silence.
+ */
 function wp_get_current_user()
 {
     return $GLOBALS['kilden_test']['current_user'];
 }
 
+/**
+ * The login cookie itself, which stays readable and verifiable in any context.
+ * Returns the user id, or false for a missing, expired or forged cookie.
+ *
+ * @return int|false
+ */
+function wp_validate_auth_cookie($cookie = '', $scheme = '')
+{
+    $user = $GLOBALS['kilden_test']['login_cookie_user'];
+
+    return $user ? (int) $user->ID : false;
+}
+
 function get_user_by($field, $value)
 {
+    $cookie_user = $GLOBALS['kilden_test']['login_cookie_user'];
+    if ($cookie_user && (int) $cookie_user->ID === (int) $value) {
+        return $cookie_user;
+    }
+
     return $GLOBALS['kilden_test']['current_user'];
 }
 
