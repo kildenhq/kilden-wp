@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-alpha.3] - 2026-07-17
+
+### Fixed
+
+- Identity verification for logged-in visitors, which had never happened: the
+  identity endpoint asked WordPress for the current user, and WordPress ignores
+  the login cookie on a REST request unless an `X-WP-Nonce` comes with it. It
+  answered 204 to every signed-in visitor, so no token was ever minted and no
+  browser event from a logged-in customer was ever verified. It validates the
+  cookie itself now — a nonce cannot work here, being per-user and per-session
+  while this endpoint exists precisely because the page HTML is cached.
+- The identity endpoint refuses cross-origin reads. WordPress echoes any
+  `Origin` back with `Access-Control-Allow-Credentials: true`, which is only
+  safe while REST cookie auth needs a nonce; without this, any site a visitor
+  opened could read their identity token and traits using their own cookie.
+
 ## [0.1.0-alpha.2] - 2026-07-17
 
 ### Fixed
@@ -52,6 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a prefixed namespace.
 - `KILDEN_SECRET_KEY` / `KILDEN_IDENTITY_SECRET` wp-config.php constants.
 
-[Unreleased]: https://github.com/kildenhq/kilden-wp/compare/v0.1.0-alpha.2...HEAD
+[Unreleased]: https://github.com/kildenhq/kilden-wp/compare/v0.1.0-alpha.3...HEAD
+[0.1.0-alpha.3]: https://github.com/kildenhq/kilden-wp/compare/v0.1.0-alpha.2...v0.1.0-alpha.3
 [0.1.0-alpha.2]: https://github.com/kildenhq/kilden-wp/compare/v0.1.0-alpha.1...v0.1.0-alpha.2
 [0.1.0-alpha.1]: https://github.com/kildenhq/kilden-wp/releases/tag/v0.1.0-alpha.1
