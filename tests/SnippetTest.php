@@ -115,7 +115,10 @@ final class SnippetTest extends TestCase
 
         $js = Kilden_Snippet::snippet_js();
 
-        self::assertStringContainsString('DOMContentLoaded', $js);
-        self::assertStringContainsString('wp_consent_type_defined', $js);
+        // Assert the listeners, not the words: both names also appear in the
+        // comment above them, so matching the bare identifiers would pass with
+        // the addEventListener calls deleted.
+        self::assertStringContainsString("document.addEventListener('DOMContentLoaded', check)", $js);
+        self::assertStringContainsString("document.addEventListener('wp_consent_type_defined', check)", $js);
     }
 }
