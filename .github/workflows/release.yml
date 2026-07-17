@@ -12,9 +12,44 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # The version the plugin reports is not cosmetic: WordPress compares the
+      # header for updates, KILDEN_WP_VERSION rides in the User-Agent (spec
+      # §4.1), and wordpress.org serves whatever Stable tag names — so a tag
+      # that disagrees with any of them ships a release that lies about
+      # itself, and tags cannot be moved afterwards. Sister SDKs published
+      # exactly such releases for want of this check.
+      - name: tag matches the declared version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          header=$(sed -n 's/^ \* Version:[[:space:]]*\(.*\)$/\1/p' kilden.php | head -1)
+          constant=$(sed -n "s/.*define('KILDEN_WP_VERSION', '\(.*\)').*/\1/p" kilden.php | head -1)
+          stable=$(sed -n 's/^Stable tag:[[:space:]]*\(.*\)$/\1/p' readme.txt | head -1)
+
+          fail=0
+          for pair in "plugin header:$header" "KILDEN_WP_VERSION:$constant" "readme.txt Stable tag:$stable"; do
+            name="${pair%%:*}"
+            value="${pair#*:}"
+            if [ "$value" != "$tag" ]; then
+              echo "::error::$name says '$value' but the tag is $GITHUB_REF_NAME — set it to '$tag'"
+              fail=1
+            fi
+          done
+          [ "$fail" -eq 0 ] || exit 1
+          echo "version $tag matches tag $GITHUB_REF_NAME in all three places"
+
       - name: build plugin zip
         run: bash bin/build-zip.sh "$GITHUB_REF_NAME"
+
+      # Derive the flag from the tag. This was a hardcoded --prerelease, which
+      # marks a stable v0.1.0 as a prerelease and leaves releases/latest
+      # answering 404 — as it did on kilden-sdk-ruby.
       - name: github release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --prerelease --generate-notes dist/kilden.zip
+        run: |
+          case "$GITHUB_REF_NAME" in
+            *-alpha*|*-beta*|*-rc*) flag=--prerelease ;;
+            *) flag=--latest ;;
+          esac
+          gh release create "$GITHUB_REF_NAME" "$flag" --generate-notes dist/kilden.zip
