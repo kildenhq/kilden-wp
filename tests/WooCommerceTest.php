@@ -82,18 +82,26 @@ final class WooCommerceTest extends TestCase
 
     public function testDistinctIdPrecedence(): void
     {
-        // 1. Bridged meta wins.
+        // 1. The logged-in customer wins, even against a bridged id. Honest
+        //    traffic loses nothing: the identity endpoint hands the browser
+        //    the id from this same filter, so the value the bridge would have
+        //    carried is the one computed here anyway — we just no longer take
+        //    the browser's word for it. See IdentityBridgeTest for why.
         $bridged = $this->order(array('id' => 1, 'customer_id' => 7));
-        $bridged->update_meta_data('_kilden_distinct_id', 'anon_from_browser');
-        self::assertSame('anon_from_browser', Kilden_WooCommerce::distinct_id_for($bridged));
+        $bridged->update_meta_data('_kilden_distinct_id', 'anon_019f6db7-7941-7290-93fe-66e1e112e2b2');
+        self::assertSame('7', Kilden_WooCommerce::distinct_id_for($bridged));
 
-        // 2. Then the logged-in customer id.
-        $customer = $this->order(array('id' => 2, 'customer_id' => 7));
-        self::assertSame('7', Kilden_WooCommerce::distinct_id_for($customer));
+        // 2. A guest is stitched to the anonymous id they browsed under.
+        $guest = $this->order(array('id' => 2));
+        $guest->update_meta_data('_kilden_distinct_id', 'anon_019f6db7-7941-7290-93fe-66e1e112e2b2');
+        self::assertSame('anon_019f6db7-7941-7290-93fe-66e1e112e2b2', Kilden_WooCommerce::distinct_id_for($guest));
 
-        // 3. Last resort: deterministic per-order id.
-        $guest = $this->order(array('id' => 3));
-        self::assertSame('anon_wp_order_3', Kilden_WooCommerce::distinct_id_for($guest));
+        // 3. Last resort: a deterministic, well-formed anonymous id.
+        $unknown = $this->order(array('id' => 3));
+        self::assertMatchesRegularExpression(
+            '/^anon_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/',
+            Kilden_WooCommerce::distinct_id_for($unknown)
+        );
     }
 
     public function testRefundEvent(): void

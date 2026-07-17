@@ -120,6 +120,11 @@ function rest_url($path = '')
     return 'https://store.example/wp-json/' . ltrim((string) $path, '/');
 }
 
+function home_url($path = '')
+{
+    return 'https://store.example' . (string) $path;
+}
+
 function nocache_headers()
 {
     $GLOBALS['kilden_test']['nocache_calls']++;
