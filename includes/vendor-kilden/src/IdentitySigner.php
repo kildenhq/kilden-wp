@@ -103,9 +103,10 @@ final class IdentitySigner
 
     /**
      * Canonical JSON (spec §6.1): keys sorted lexicographically at every
-     * nesting level, compact separators, UTF-8 preserved, and the three
-     * HTML-unsafe chars escaped as lowercase \u0026 / \u003c / \u003e to match
-     * the platform's Go serializer byte for byte.
+     * nesting level, compact separators, UTF-8 preserved, the three
+     * HTML-unsafe chars escaped as lowercase \u0026 / \u003c / \u003e and the
+     * JS line separators U+2028/U+2029 as \u2028 / \u2029, matching the
+     * platform's Go serializer byte for byte.
      *
      * @param array<string, mixed> $value
      */
@@ -118,9 +119,14 @@ final class IdentitySigner
         }
 
         // PHP's JSON_HEX_* flags emit uppercase hex; the platform's Go
-        // serializer emits lowercase (\u003c). Raw &, <, > only ever appear
-        // inside string values at this point, so a plain replace is exact.
-        return str_replace(['&', '<', '>'], ['\u0026', '\u003c', '\u003e'], $encoded);
+        // serializer emits lowercase (\u003c). Raw &, <, > (and the JS line
+        // separators) only ever appear inside string values at this point,
+        // so a plain replace is exact.
+        return str_replace(
+            ['&', '<', '>', "\u{2028}", "\u{2029}"],
+            ['\u0026', '\u003c', '\u003e', '\u2028', '\u2029'],
+            $encoded
+        );
     }
 
     /**

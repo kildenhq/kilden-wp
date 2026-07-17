@@ -51,18 +51,25 @@ class Kilden_Fake_Order
     public function __construct(array $data = array())
     {
         $this->data = array_merge(array(
-            'id'          => 1001,
-            'total'       => 149.90,
-            'currency'    => 'CLP',
-            'customer_id' => 0,
-            'coupons'     => array(),
-            'items'       => array(),
+            'id'           => 1001,
+            'total'        => 149.90,
+            'currency'     => 'CLP',
+            'customer_id'  => 0,
+            'coupons'      => array(),
+            'items'        => array(),
+            'date_created' => new DateTimeImmutable('2026-07-17 01:40:56'),
         ), $data);
     }
 
     public function get_id()
     {
         return $this->data['id'];
+    }
+
+    /** WC_Order returns a WC_DateTime here, and null for an unsaved order. */
+    public function get_date_created()
+    {
+        return $this->data['date_created'];
     }
 
     public function get_total()

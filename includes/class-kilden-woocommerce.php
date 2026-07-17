@@ -5,14 +5,20 @@
  * Revenue is tracked SERVER-SIDE with the secret key: a browser
  * `track('purchase')` can be forged by anyone with the public key, a
  * server event cannot. The hard part is the distinct_id bridge: the order
- * completes on the server, but the buyer's identity (`anon_...`) lives in
- * the browser. Three mechanisms, in order of precedence, all persisted to
- * order meta so events can be reprocessed and debugged:
+ * completes on the server, but a guest's identity (`anon_...`) lives only in
+ * the browser. Three mechanisms, in order of precedence:
  *
- *   1. The checkout bridge: JS reads kilden.getDistinctId() into a hidden
- *      checkout field (classic) or a session-backed REST call (blocks).
- *   2. Logged-in customer → WP user id.
+ *   1. Logged-in customer → WP user id, resolved here rather than taken from
+ *      the browser. Same value either way (the identity endpoint hands the
+ *      browser the id from this same filter), minus the trust.
+ *   2. The checkout bridge, for guests: JS reads kilden.getDistinctId() into
+ *      a hidden field (classic) or a session-backed REST call (blocks). It
+ *      may only ever carry an anonymous id — everything it says is untrusted
+ *      input that would otherwise reach the platform as verified fact.
  *   3. Last resort: a deterministic per-order anonymous id, documented.
+ *
+ * The bridged id is persisted to order meta so events can be reprocessed and
+ * debugged, but it is re-checked on every read: meta may predate the rule.
  */
 
 if (!defined('ABSPATH')) {
@@ -130,28 +136,89 @@ class Kilden_WooCommerce
     }
 
     /**
-     * Precedence: order meta (the bridge) → customer user id → documented
-     * last-resort anonymous id. The meta read comes first ALWAYS: it is what
-     * makes events reprocessable.
+     * Precedence: authenticated customer → the bridged id (guests only, and
+     * only in the anonymous shape) → documented last-resort anonymous id.
+     *
+     * The customer comes first ALWAYS. The bridged id arrives in a checkout
+     * form field, and this event goes out server-side with the secret key,
+     * which the platform reads as authenticated fact — so letting the browser
+     * outrank the session lets a buyer name someone else and land their
+     * revenue on that person. It used to.
      *
      * @param WC_Order $order
      */
     public static function distinct_id_for($order): string
     {
-        $bridged = (string) $order->get_meta(self::META_DISTINCT_ID);
-        if ($bridged !== '') {
-            return $bridged;
-        }
-
+        // The customer WordPress authenticated outranks anything the browser
+        // said. The bridged id travels in a form field, so letting it win
+        // here would let a buyer post someone else's id and have their order
+        // land on that person's timeline as verified fact — this send goes
+        // out server-side with the secret key, which the platform trusts.
         $user_id = (int) $order->get_customer_id();
         if ($user_id > 0) {
             return (string) apply_filters('kilden_distinct_id_for_user', (string) $user_id, get_user_by('id', $user_id));
         }
 
-        // Documented last resort: guest checkout where the bridge did not
-        // run (JS blocked, headless order). Deterministic so a reprocess
-        // lands on the same person.
-        return 'anon_wp_order_' . $order->get_id();
+        // For guests the bridge exists to stitch the order onto the anonymous
+        // id the visitor browsed under, so an anonymous id is the only thing
+        // it is allowed to say. Checked again here and not only on the way in:
+        // meta can predate this rule, or be written by anything else.
+        $bridged = (string) $order->get_meta(self::META_DISTINCT_ID);
+        if (self::is_anonymous_id($bridged)) {
+            return $bridged;
+        }
+
+        return self::synthetic_anonymous_id($order);
+    }
+
+    /**
+     * Mirror of kilden-core's internal/verify.AnonPattern (docs/11): the exact
+     * shape the platform reads as anonymous. An id that misses it — including
+     * `anon_` followed by some other random string — is read as a
+     * customer-declared *identified* id instead, and the resolver then refuses
+     * to merge it with anything ("two non-anonymous identities"). Nothing
+     * errors; the visitor's history simply never joins up.
+     */
+    private static function is_anonymous_id(string $id): bool
+    {
+        return (bool) preg_match(
+            '/^anon_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/',
+            $id
+        );
+    }
+
+    /**
+     * Documented last resort: guest checkout where the bridge never ran (JS
+     * blocked, order created headlessly). We do not know who this is, so the
+     * id has to say precisely that rather than invent an identified person
+     * per order. Deterministic, so reprocessing an order lands on the same
+     * person, and salted with the site so two stores sharing one Kilden
+     * project cannot collide on order numbers.
+     *
+     * @param WC_Order $order
+     */
+    private static function synthetic_anonymous_id($order): string
+    {
+        $created = $order->get_date_created();
+        $ms = $created ? ((int) $created->getTimestamp()) * 1000 : 0;
+
+        // UUIDv7 (RFC 9562): 48-bit big-endian millisecond timestamp, then
+        // version and variant bits, then bytes that are random in a real v7
+        // and derived here so that the id is stable for this order.
+        $bytes = substr(pack('J', $ms), 2, 6)
+            . substr(hash('sha256', home_url() . '|kilden-wp-order|' . $order->get_id(), true), 0, 10);
+        $bytes[6] = chr((ord($bytes[6]) & 0x0f) | 0x70);
+        $bytes[8] = chr((ord($bytes[8]) & 0x3f) | 0x80);
+
+        $hex = bin2hex($bytes);
+
+        return 'anon_' . implode('-', array(
+            substr($hex, 0, 8),
+            substr($hex, 8, 4),
+            substr($hex, 12, 4),
+            substr($hex, 16, 4),
+            substr($hex, 20, 12),
+        ));
     }
 
     // --- distinct_id bridge ---
@@ -169,9 +236,10 @@ class Kilden_WooCommerce
     public static function persist_distinct_id_classic($order, $data = null): void
     {
         // Nonce-free by design: this is the buyer's own analytics id for
-        // their own order, sanitized, no capability change involved.
+        // their own order, sanitized, no capability change involved. It is
+        // still only ever an anonymous id — see is_anonymous_id().
         $posted = isset($_POST['kilden_distinct_id']) ? sanitize_text_field(wp_unslash((string) $_POST['kilden_distinct_id'])) : '';
-        if ($posted !== '' && strlen($posted) <= 512) {
+        if (self::is_anonymous_id($posted)) {
             $order->update_meta_data(self::META_DISTINCT_ID, $posted);
         }
     }
@@ -187,7 +255,7 @@ class Kilden_WooCommerce
             return;
         }
         $session = function_exists('WC') && WC()->session ? (string) WC()->session->get(self::SESSION_KEY) : '';
-        if ($session !== '') {
+        if (self::is_anonymous_id($session)) {
             $order->update_meta_data(self::META_DISTINCT_ID, $session);
             $order->save();
         }
@@ -217,10 +285,31 @@ class Kilden_WooCommerce
     public static function handle_bridge($request)
     {
         nocache_headers();
+
         $id = sanitize_text_field((string) $request->get_param('distinct_id'));
-        if ($id !== '' && strlen($id) <= 512 && function_exists('WC') && WC()->session) {
-            WC()->session->set(self::SESSION_KEY, $id);
+        if (!self::is_anonymous_id($id)) {
+            return new WP_REST_Response(array('status' => 'ignored'), 400);
         }
+
+        if (!function_exists('WC')) {
+            return new WP_REST_Response(array('status' => 'unavailable'), 503);
+        }
+
+        // WooCommerce only boots the session for frontend and Store API
+        // requests, so on a custom REST route like this one WC()->session is
+        // null and there is nothing to write to. wc_load_cart() is the
+        // supported way to ask for it; without this the route did nothing at
+        // all and still answered 200, which is how the blocks checkout — the
+        // default one — quietly lost every guest's id.
+        if (!WC()->session && function_exists('wc_load_cart')) {
+            wc_load_cart();
+        }
+
+        if (!WC()->session) {
+            return new WP_REST_Response(array('status' => 'unavailable'), 503);
+        }
+
+        WC()->session->set(self::SESSION_KEY, $id);
 
         return new WP_REST_Response(array('status' => 'ok'), 200);
     }

@@ -22,6 +22,8 @@ $GLOBALS['kilden_test'] = array(
     'current_user' => null,
     'rest_routes'  => array(),
     'nocache_calls' => 0,
+    'wc'           => null,
+    'wc_load_cart_calls' => 0,
 );
 
 function kilden_test_reset(): void
@@ -35,6 +37,8 @@ function kilden_test_reset(): void
         'current_user' => null,
         'rest_routes'  => array(),
         'nocache_calls' => 0,
+        'wc'           => new Kilden_Fake_WC(),
+        'wc_load_cart_calls' => 0,
     );
     Kilden_Settings::reset_cache();
     Kilden_Client_Factory::reset();
@@ -118,6 +122,11 @@ function esc_attr($text)
 function rest_url($path = '')
 {
     return 'https://store.example/wp-json/' . ltrim((string) $path, '/');
+}
+
+function home_url($path = '')
+{
+    return 'https://store.example' . (string) $path;
 }
 
 function nocache_headers()
@@ -248,4 +257,65 @@ require __DIR__ . '/support/RecordingTransport.php';
 function wc_get_order($id)
 {
     return $GLOBALS['kilden_test']['orders'][$id] ?? false;
+}
+
+/**
+ * `session` is null until something boots it — which is the interesting part,
+ * not an implementation detail: WooCommerce leaves it null on custom REST
+ * routes, and that is what silently broke the blocks bridge.
+ */
+class Kilden_Fake_WC
+{
+    /** @var Kilden_Fake_WC_Session|null */
+    public $session = null;
+}
+
+class Kilden_Fake_WC_Session
+{
+    /** @var array<string, mixed> */
+    private $data = array();
+
+    /** @return mixed */
+    public function get(string $key, $default = null)
+    {
+        return $this->data[$key] ?? $default;
+    }
+
+    /** @param mixed $value */
+    public function set(string $key, $value): void
+    {
+        $this->data[$key] = $value;
+    }
+}
+
+function WC()
+{
+    return $GLOBALS['kilden_test']['wc'];
+}
+
+function wc_load_cart()
+{
+    // The real one boots the session; the fake records that it was asked.
+    $GLOBALS['kilden_test']['wc_load_cart_calls']++;
+    if ($GLOBALS['kilden_test']['wc']->session === null) {
+        $GLOBALS['kilden_test']['wc']->session = new Kilden_Fake_WC_Session();
+    }
+}
+
+class Kilden_Fake_Request
+{
+    /** @var array<string, mixed> */
+    private $params;
+
+    /** @param array<string, mixed> $params */
+    public function __construct(array $params = array())
+    {
+        $this->params = $params;
+    }
+
+    /** @return mixed */
+    public function get_param(string $key)
+    {
+        return $this->params[$key] ?? null;
+    }
 }
