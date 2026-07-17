@@ -21,6 +21,7 @@ $GLOBALS['kilden_test'] = array(
     'remote_response' => null,
     'current_user' => null,
     'login_cookie_user' => null,
+    'http_origin'  => null,
     'rest_routes'  => array(),
     'nocache_calls' => 0,
     'wc'           => null,
@@ -37,6 +38,7 @@ function kilden_test_reset(): void
         'remote_response' => null,
         'current_user' => null,
         'login_cookie_user' => null,
+        'http_origin'  => null,
         'rest_routes'  => array(),
         'nocache_calls' => 0,
         'wc'           => new Kilden_Fake_WC(),
@@ -129,6 +131,17 @@ function rest_url($path = '')
 function home_url($path = '')
 {
     return 'https://store.example' . (string) $path;
+}
+
+/** The Origin header, as WordPress reads it. Null for a same-origin GET. */
+function get_http_origin()
+{
+    return $GLOBALS['kilden_test']['http_origin'];
+}
+
+function wp_parse_url($url, $component = -1)
+{
+    return parse_url($url, $component);
 }
 
 function nocache_headers()

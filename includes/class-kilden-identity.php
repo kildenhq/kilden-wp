@@ -62,11 +62,21 @@ class Kilden_Identity
         // Sending a nonce is not an option: it is per-user and per-session,
         // and this whole endpoint exists because the page HTML is cached and
         // shared. wp_validate_auth_cookie checks the cookie's own HMAC, so a
-        // missing, expired or forged one resolves to nobody. What is given up
-        // is nonce CSRF protection, which this read does not need: a
-        // cross-origin caller can make the browser send the cookie but cannot
-        // read the response, and the token only ever vouches for the caller's
-        // own session.
+        // missing, expired or forged one resolves to nobody.
+        //
+        // What a nonce also bought, though, was the right to answer any
+        // origin: WordPress echoes the caller's Origin back with
+        // Access-Control-Allow-Credentials: true (rest_send_cors_headers),
+        // which is only safe because REST cookie auth needs that nonce. Since
+        // this route no longer asks for one, a cross-origin read has to be
+        // refused right here, or any site the visitor happens to open could
+        // lift their token and traits using their own cookie. Same-origin GETs
+        // send no Origin at all, which is how the snippet's fetch arrives.
+        $origin = get_http_origin();
+        if ($origin && !self::is_own_origin($origin)) {
+            return self::answer(new WP_REST_Response(null, 204));
+        }
+
         $user_id = (int) wp_validate_auth_cookie('', 'logged_in');
         $user = $user_id > 0 ? get_user_by('id', $user_id) : null;
         if (!$user || 0 === (int) $user->ID) {
@@ -78,9 +88,40 @@ class Kilden_Identity
                 : new WP_REST_Response($payload, 200);
         }
 
+        return self::answer($response);
+    }
+
+    /**
+     * Per-visitor and short-lived: never store it, anywhere.
+     *
+     * @param WP_REST_Response $response
+     * @return WP_REST_Response
+     */
+    private static function answer($response)
+    {
         $response->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
 
         return $response;
+    }
+
+    /** Does this Origin belong to this site? */
+    private static function is_own_origin(string $origin): bool
+    {
+        return self::origin_of($origin) !== '' && self::origin_of($origin) === self::origin_of(home_url());
+    }
+
+    /** scheme://host[:port], lowercased; '' when there is no host to compare. */
+    private static function origin_of(string $url): string
+    {
+        $parts = wp_parse_url($url);
+        if (!is_array($parts) || empty($parts['host'])) {
+            return '';
+        }
+
+        $scheme = isset($parts['scheme']) ? strtolower($parts['scheme']) : 'http';
+        $port = isset($parts['port']) ? ':' . (int) $parts['port'] : '';
+
+        return $scheme . '://' . strtolower($parts['host']) . $port;
     }
 
     /**

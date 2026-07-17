@@ -57,6 +57,46 @@ final class IdentityTest extends TestCase
         self::assertSame('42', $response->data['distinct_id']);
     }
 
+    public function testACrossOriginCallerGetsNothing(): void
+    {
+        // This is what authenticating by cookie costs, and it has to be paid
+        // here. WordPress answers any Origin with Access-Control-Allow-Origin
+        // plus Access-Control-Allow-Credentials: true
+        // (rest_send_cors_headers). Core can afford that because REST cookie
+        // auth needs a nonce; this endpoint no longer asks for one, so
+        // without this check any site the visitor happens to open could read
+        // their token and traits with their own cookie.
+        $GLOBALS['kilden_test']['login_cookie_user'] = new WP_User(42, 'user@example.com', 'Test User');
+        $GLOBALS['kilden_test']['http_origin'] = 'https://evil.example';
+
+        $response = Kilden_Identity::handle(null);
+
+        self::assertSame(204, $response->status);
+        self::assertNull($response->data);
+    }
+
+    public function testTheSitesOwnOriginIsFine(): void
+    {
+        $GLOBALS['kilden_test']['login_cookie_user'] = new WP_User(42, 'user@example.com', 'Test User');
+        $GLOBALS['kilden_test']['http_origin'] = 'https://store.example';
+
+        $response = Kilden_Identity::handle(null);
+
+        self::assertSame(200, $response->status);
+        self::assertSame('42', $response->data['distinct_id']);
+    }
+
+    public function testASameOriginGetSendsNoOriginHeaderAtAll(): void
+    {
+        // Which is how the snippet's own fetch arrives.
+        $GLOBALS['kilden_test']['login_cookie_user'] = new WP_User(42, 'user@example.com', 'Test User');
+        $GLOBALS['kilden_test']['http_origin'] = null;
+
+        $response = Kilden_Identity::handle(null);
+
+        self::assertSame(200, $response->status);
+    }
+
     public function testLoggedInVisitorGetsSignedIdentity(): void
     {
         $GLOBALS['kilden_test']['login_cookie_user'] = new WP_User(42, 'user@example.com', 'Test User');
