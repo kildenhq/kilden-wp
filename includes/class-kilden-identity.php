@@ -51,7 +51,34 @@ class Kilden_Identity
     {
         nocache_headers();
 
-        $user = wp_get_current_user();
+        // Read the login cookie ourselves rather than asking for the current
+        // user. On a REST request WordPress ignores that cookie unless an
+        // X-WP-Nonce comes with it (rest_cookie_check_errors calls
+        // wp_set_current_user(0)), so wp_get_current_user() is nobody here
+        // even for a signed-in visitor — this endpoint answered 204 to every
+        // one of them, so no token was ever minted and no browser event was
+        // ever verified.
+        //
+        // Sending a nonce is not an option: it is per-user and per-session,
+        // and this whole endpoint exists because the page HTML is cached and
+        // shared. wp_validate_auth_cookie checks the cookie's own HMAC, so a
+        // missing, expired or forged one resolves to nobody.
+        //
+        // What a nonce also bought, though, was the right to answer any
+        // origin: WordPress echoes the caller's Origin back with
+        // Access-Control-Allow-Credentials: true (rest_send_cors_headers),
+        // which is only safe because REST cookie auth needs that nonce. Since
+        // this route no longer asks for one, a cross-origin read has to be
+        // refused right here, or any site the visitor happens to open could
+        // lift their token and traits using their own cookie. Same-origin GETs
+        // send no Origin at all, which is how the snippet's fetch arrives.
+        $origin = get_http_origin();
+        if ($origin && !self::is_own_origin($origin)) {
+            return self::answer(new WP_REST_Response(null, 204));
+        }
+
+        $user_id = (int) wp_validate_auth_cookie('', 'logged_in');
+        $user = $user_id > 0 ? get_user_by('id', $user_id) : null;
         if (!$user || 0 === (int) $user->ID) {
             $response = new WP_REST_Response(null, 204);
         } else {
@@ -61,9 +88,49 @@ class Kilden_Identity
                 : new WP_REST_Response($payload, 200);
         }
 
+        return self::answer($response);
+    }
+
+    /**
+     * Per-visitor and short-lived: never store it, anywhere.
+     *
+     * @param WP_REST_Response $response
+     * @return WP_REST_Response
+     */
+    private static function answer($response)
+    {
         $response->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
 
         return $response;
+    }
+
+    /** Does this Origin belong to this site? */
+    private static function is_own_origin(string $origin): bool
+    {
+        return self::origin_of($origin) !== '' && self::origin_of($origin) === self::origin_of(home_url());
+    }
+
+    /**
+     * scheme://host[:port], lowercased, with the scheme's default port
+     * dropped; '' when there is no host to compare. A browser never puts the
+     * default port in an Origin, but home_url() may well carry it, and this
+     * comparison failing shut would quietly switch identity off for that site.
+     */
+    private static function origin_of(string $url): string
+    {
+        $parts = wp_parse_url($url);
+        if (!is_array($parts) || empty($parts['host'])) {
+            return '';
+        }
+
+        $scheme = isset($parts['scheme']) ? strtolower($parts['scheme']) : 'http';
+        $defaults = array('http' => 80, 'https' => 443);
+        $default = isset($defaults[$scheme]) ? $defaults[$scheme] : null;
+
+        $port = isset($parts['port']) ? (int) $parts['port'] : null;
+        $suffix = ($port === null || $port === $default) ? '' : ':' . $port;
+
+        return $scheme . '://' . strtolower($parts['host']) . $suffix;
     }
 
     /**

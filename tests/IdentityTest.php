@@ -16,7 +16,7 @@ final class IdentityTest extends TestCase
 
     public function testAnonymousVisitorGets204(): void
     {
-        $GLOBALS['kilden_test']['current_user'] = null;
+        $GLOBALS['kilden_test']['login_cookie_user'] = null;
 
         $response = Kilden_Identity::handle(null);
 
@@ -25,9 +25,105 @@ final class IdentityTest extends TestCase
         self::assertStringContainsString('no-store', $response->headers['Cache-Control']);
     }
 
+    public function testAForgedOrExpiredCookieIsAnonymous(): void
+    {
+        // wp_validate_auth_cookie checks the cookie's HMAC, so a forged one
+        // resolves to nobody — the same answer as no cookie at all.
+        $GLOBALS['kilden_test']['login_cookie_user'] = null;
+        $GLOBALS['kilden_test']['current_user'] = new WP_User(42, 'user@example.com', 'Test User');
+
+        $response = Kilden_Identity::handle(null);
+
+        self::assertSame(204, $response->status);
+    }
+
+    public function testTheRestContextHasNoCurrentUserOnlyACookie(): void
+    {
+        // The bug this endpoint shipped with. WordPress ignores the login
+        // cookie on a REST request unless an X-WP-Nonce comes with it, so
+        // wp_get_current_user() is nobody there — while the cookie itself is
+        // perfectly valid. Reading the current user meant answering 204 to
+        // every logged-in visitor, so no identity token was ever minted and
+        // no browser event was ever verified.
+        //
+        // A nonce is not the fix: it is per-user and per-session, and this
+        // snippet renders into pages a cache serves to everyone.
+        $GLOBALS['kilden_test']['current_user'] = null;
+        $GLOBALS['kilden_test']['login_cookie_user'] = new WP_User(42, 'user@example.com', 'Test User');
+
+        $response = Kilden_Identity::handle(null);
+
+        self::assertSame(200, $response->status);
+        self::assertSame('42', $response->data['distinct_id']);
+    }
+
+    public function testACrossOriginCallerGetsNothing(): void
+    {
+        // This is what authenticating by cookie costs, and it has to be paid
+        // here. WordPress answers any Origin with Access-Control-Allow-Origin
+        // plus Access-Control-Allow-Credentials: true
+        // (rest_send_cors_headers). Core can afford that because REST cookie
+        // auth needs a nonce; this endpoint no longer asks for one, so
+        // without this check any site the visitor happens to open could read
+        // their token and traits with their own cookie.
+        $GLOBALS['kilden_test']['login_cookie_user'] = new WP_User(42, 'user@example.com', 'Test User');
+        $GLOBALS['kilden_test']['http_origin'] = 'https://evil.example';
+
+        $response = Kilden_Identity::handle(null);
+
+        self::assertSame(204, $response->status);
+        self::assertNull($response->data);
+    }
+
+    public function testTheSitesOwnOriginIsFine(): void
+    {
+        $GLOBALS['kilden_test']['login_cookie_user'] = new WP_User(42, 'user@example.com', 'Test User');
+        $GLOBALS['kilden_test']['http_origin'] = 'https://store.example';
+
+        $response = Kilden_Identity::handle(null);
+
+        self::assertSame(200, $response->status);
+        self::assertSame('42', $response->data['distinct_id']);
+    }
+
+    public function testTheDefaultPortDoesNotMakeAnOriginForeign(): void
+    {
+        // A browser never puts :443 in an Origin, but home_url() can carry it.
+        // Comparing the two literally would fail shut and switch identity off
+        // for that site, quietly — the failure mode this whole endpoint keeps
+        // running into.
+        $GLOBALS['kilden_test']['login_cookie_user'] = new WP_User(42, 'user@example.com', 'Test User');
+        $GLOBALS['kilden_test']['http_origin'] = 'https://store.example:443';
+
+        $response = Kilden_Identity::handle(null);
+
+        self::assertSame(200, $response->status);
+    }
+
+    public function testAnotherPortIsStillAForeignOrigin(): void
+    {
+        $GLOBALS['kilden_test']['login_cookie_user'] = new WP_User(42, 'user@example.com', 'Test User');
+        $GLOBALS['kilden_test']['http_origin'] = 'https://store.example:8443';
+
+        $response = Kilden_Identity::handle(null);
+
+        self::assertSame(204, $response->status);
+    }
+
+    public function testASameOriginGetSendsNoOriginHeaderAtAll(): void
+    {
+        // Which is how the snippet's own fetch arrives.
+        $GLOBALS['kilden_test']['login_cookie_user'] = new WP_User(42, 'user@example.com', 'Test User');
+        $GLOBALS['kilden_test']['http_origin'] = null;
+
+        $response = Kilden_Identity::handle(null);
+
+        self::assertSame(200, $response->status);
+    }
+
     public function testLoggedInVisitorGetsSignedIdentity(): void
     {
-        $GLOBALS['kilden_test']['current_user'] = new WP_User(42, 'user@example.com', 'Test User');
+        $GLOBALS['kilden_test']['login_cookie_user'] = new WP_User(42, 'user@example.com', 'Test User');
 
         $response = Kilden_Identity::handle(null);
 
@@ -52,7 +148,7 @@ final class IdentityTest extends TestCase
 
     public function testTraitsAndDistinctIdAreFilterable(): void
     {
-        $GLOBALS['kilden_test']['current_user'] = new WP_User(42, 'user@example.com', 'Test User');
+        $GLOBALS['kilden_test']['login_cookie_user'] = new WP_User(42, 'user@example.com', 'Test User');
         add_filter('kilden_distinct_id_for_user', static function ($id, $user) {
             return 'customer_' . $id;
         });
@@ -75,7 +171,7 @@ final class IdentityTest extends TestCase
 
         self::assertFalse(Kilden_Identity::active());
 
-        $GLOBALS['kilden_test']['current_user'] = new WP_User(42);
+        $GLOBALS['kilden_test']['login_cookie_user'] = new WP_User(42);
         $response = Kilden_Identity::handle(null);
         self::assertSame(204, $response->status);
     }
