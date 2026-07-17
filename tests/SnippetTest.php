@@ -87,4 +87,38 @@ final class SnippetTest extends TestCase
         // No unconditional boot when consent is managed.
         self::assertStringNotContainsString("\nkildenBoot();", $js);
     }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function testConsentGateReChecksOnceTheConsentApiHasLoaded(): void
+    {
+        // The bug this shipped with. This snippet is the first script on the
+        // page; the consent API's own script is dozens of scripts later, so
+        // wp_has_consent does not exist yet when the gate first runs. Asking
+        // once and then waiting for a *change* meant that a visitor who had
+        // already consented never triggered anything — the change never comes
+        // — and Kilden simply never loaded, silently, on every site with a
+        // consent plugin.
+        //
+        // The API's script is parser-blocking, so it has run by
+        // DOMContentLoaded. wp_consent_type_defined covers a consent manager
+        // that announces itself later.
+        function wp_has_consent($category)
+        {
+            return false;
+        }
+
+        update_option(Kilden_Settings::OPTION, array('public_key' => 'wk_test_public'));
+        Kilden_Settings::reset_cache();
+
+        $js = Kilden_Snippet::snippet_js();
+
+        // Assert the listeners, not the words: both names also appear in the
+        // comment above them, so matching the bare identifiers would pass with
+        // the addEventListener calls deleted.
+        self::assertStringContainsString("document.addEventListener('DOMContentLoaded', check)", $js);
+        self::assertStringContainsString("document.addEventListener('wp_consent_type_defined', check)", $js);
+    }
 }
