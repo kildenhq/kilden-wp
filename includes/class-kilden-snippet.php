@@ -144,7 +144,23 @@ JS;
     function granted() {
       return typeof wp_has_consent === 'function' && wp_has_consent('statistics');
     }
-    if (granted()) { bootOnce(); return; }
+    function check() { if (granted()) bootOnce(); }
+
+    // Asking once, here, is not enough: this snippet is the first script on
+    // the page and the consent API's own script comes dozens of scripts
+    // later, so wp_has_consent does not exist yet and every visitor looks
+    // unconsented. Waiting for a change from there never helps a visitor who
+    // had already consented, because nothing ever changes — Kilden just never
+    // loaded, silently, wherever a consent plugin was installed.
+    //
+    // So ask again once that script has run. It is parser-blocking, so
+    // DOMContentLoaded is late enough; wp_consent_type_defined covers a
+    // consent manager that announces its type later still.
+    check();
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', check);
+    }
+    document.addEventListener('wp_consent_type_defined', check);
     document.addEventListener('wp_listen_for_consent_change', function (e) {
       var changed = e.detail || {};
       if (changed.statistics === 'allow') bootOnce();
