@@ -2,9 +2,9 @@
 Contributors: freshworkstudio
 Tags: analytics, woocommerce, ecommerce, statistics, customer data
 Requires at least: 6.0
-Tested up to: 6.8
+Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 0.1.0
+Stable tag: 0.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -25,6 +25,35 @@ What makes it different from pasting a script tag:
 Events recorded with WooCommerce active: product viewed, product added to cart, checkout started (in the browser), order completed and order refunded (from your server, with order id, revenue, currency, items and coupon).
 
 You need a Kilden account and a project. Get one at [kilden.io](https://kilden.io).
+
+= External services =
+
+This plugin sends data to Kilden, the analytics service it connects your site
+to. It is not optional: sending your site's data to your Kilden project is what
+the plugin is for. Nothing is sent until you enter your project keys in
+Settings → Kilden.
+
+It relies on Kilden in two ways:
+
+1. **The visitor script**, loaded in your visitors' browsers from
+`https://cdn.kilden.io/kilden.iife.js`. Once loaded it sends page views,
+clicks and the WooCommerce browsing events listed above to
+`https://ingest.kilden.io`, together with the information the Kilden script
+collects about the visit: page URL and referrer, browser and device
+characteristics, and an anonymous visitor id it stores in the browser. For a
+logged-in visitor it also sends that user's WordPress user id, email address
+and display name, so the visit can be attributed to them. If a consent plugin
+supporting the WP Consent API is installed, none of this happens until the
+statistics category is granted.
+
+2. **Order tracking**, sent from your server to `https://ingest.kilden.io`
+when WooCommerce records an order as paid or refunded. Each message carries
+the order id, revenue, currency, coupon, the products bought (id, name, price,
+quantity), and the id of the customer or anonymous visitor the order belongs
+to.
+
+Service: Kilden — [kilden.io](https://kilden.io) ·
+[Terms](https://kilden.io/terms) · [Privacy policy](https://kilden.io/privacy)
 
 == Installation ==
 
@@ -69,6 +98,19 @@ It is the standard practice for WordPress plugins, and it means any plugin with 
 3. A completed order arriving as a server-side `order_completed` event.
 
 == Changelog ==
+
+= 0.1.1 =
+* Declared the external service in this readme: what is sent to Kilden, when, and from where.
+* Tested up to WordPress 7.0.
+
+= 0.1.0 =
+* First release verified end to end against a real WordPress and WooCommerce store: browsing, checkout (block and classic, as guest and as a signed-in customer), revenue, refunds, identity and consent.
+* Fixed: server-side order and refund tracking never reached Kilden.
+* Fixed: on the block checkout — the default one — a guest's order was recorded as a visitor of its own instead of the person who placed it.
+* Fixed: logged-in visitors were never identified, so their browser events were never verified.
+* Fixed: consent gating switched tracking off entirely wherever a WP Consent API plugin was installed.
+* Security: a buyer could name someone else as the person an order belonged to.
+* Security: another site could read a logged-in visitor's identity token.
 
 = 0.1.0-alpha.1 =
 * Initial release: visitor snippet with consent gating, cache-safe identity endpoint, WooCommerce server-side order and refund tracking with the distinct_id bridge.
