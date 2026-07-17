@@ -86,6 +86,30 @@ final class IdentityTest extends TestCase
         self::assertSame('42', $response->data['distinct_id']);
     }
 
+    public function testTheDefaultPortDoesNotMakeAnOriginForeign(): void
+    {
+        // A browser never puts :443 in an Origin, but home_url() can carry it.
+        // Comparing the two literally would fail shut and switch identity off
+        // for that site, quietly — the failure mode this whole endpoint keeps
+        // running into.
+        $GLOBALS['kilden_test']['login_cookie_user'] = new WP_User(42, 'user@example.com', 'Test User');
+        $GLOBALS['kilden_test']['http_origin'] = 'https://store.example:443';
+
+        $response = Kilden_Identity::handle(null);
+
+        self::assertSame(200, $response->status);
+    }
+
+    public function testAnotherPortIsStillAForeignOrigin(): void
+    {
+        $GLOBALS['kilden_test']['login_cookie_user'] = new WP_User(42, 'user@example.com', 'Test User');
+        $GLOBALS['kilden_test']['http_origin'] = 'https://store.example:8443';
+
+        $response = Kilden_Identity::handle(null);
+
+        self::assertSame(204, $response->status);
+    }
+
     public function testASameOriginGetSendsNoOriginHeaderAtAll(): void
     {
         // Which is how the snippet's own fetch arrives.

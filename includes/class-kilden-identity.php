@@ -110,7 +110,12 @@ class Kilden_Identity
         return self::origin_of($origin) !== '' && self::origin_of($origin) === self::origin_of(home_url());
     }
 
-    /** scheme://host[:port], lowercased; '' when there is no host to compare. */
+    /**
+     * scheme://host[:port], lowercased, with the scheme's default port
+     * dropped; '' when there is no host to compare. A browser never puts the
+     * default port in an Origin, but home_url() may well carry it, and this
+     * comparison failing shut would quietly switch identity off for that site.
+     */
     private static function origin_of(string $url): string
     {
         $parts = wp_parse_url($url);
@@ -119,9 +124,13 @@ class Kilden_Identity
         }
 
         $scheme = isset($parts['scheme']) ? strtolower($parts['scheme']) : 'http';
-        $port = isset($parts['port']) ? ':' . (int) $parts['port'] : '';
+        $defaults = array('http' => 80, 'https' => 443);
+        $default = isset($defaults[$scheme]) ? $defaults[$scheme] : null;
 
-        return $scheme . '://' . strtolower($parts['host']) . $port;
+        $port = isset($parts['port']) ? (int) $parts['port'] : null;
+        $suffix = ($port === null || $port === $default) ? '' : ':' . $port;
+
+        return $scheme . '://' . strtolower($parts['host']) . $suffix;
     }
 
     /**
