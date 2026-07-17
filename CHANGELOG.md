@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- The readme declares the external service, as the wordpress.org guidelines
+- The readme declares the external service, as the WordPress.org guidelines
   require of any plugin that calls out: what is sent to Kilden, when, from the
   browser and from the server, and links to the terms and privacy policy.
 
