@@ -12,6 +12,8 @@
  * Usage: php bin/build-vendor.php [path-to-kilden-sdk-php]
  */
 
+require __DIR__ . '/vendor-leftovers.php';
+
 $source = isset($argv[1]) ? rtrim($argv[1], '/') : dirname(__DIR__, 2) . '/kilden-sdk-php';
 $sourceSrc = $source . '/src';
 $target = dirname(__DIR__) . '/includes/vendor-kilden';
@@ -91,21 +93,7 @@ PHP);
 // repo's own test suite, since Composer installs it as a dev dependency — so
 // the only place a miss shows up is a real WordPress install, at runtime, as
 // a fatal. Fail the build here instead.
-$leftovers = array();
-$written = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($target . '/src', FilesystemIterator::SKIP_DOTS));
-foreach ($written as $file) {
-    if ($file->getExtension() !== 'php') {
-        continue;
-    }
-    $file = $file->getPathname();
-    foreach (file($file, FILE_IGNORE_NEW_LINES) as $i => $line) {
-        if (preg_match('/^namespace Kilden[;\\\\]/', $line)
-            || preg_match('/^use Kilden\\\\/', $line)
-            || preg_match('/(?<!Vendor)\\\\Kilden\\\\/', $line)) {
-            $leftovers[] = substr($file, strlen($target) + 1) . ':' . ($i + 1) . '  ' . trim($line);
-        }
-    }
-}
+$leftovers = kilden_wp_unprefixed_leftovers($target);
 
 if ($leftovers !== array()) {
     fwrite(STDERR, "unprefixed references survived the rewrite:\n  " . implode("\n  ", $leftovers) . "\n");

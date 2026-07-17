@@ -5,14 +5,20 @@
  * Revenue is tracked SERVER-SIDE with the secret key: a browser
  * `track('purchase')` can be forged by anyone with the public key, a
  * server event cannot. The hard part is the distinct_id bridge: the order
- * completes on the server, but the buyer's identity (`anon_...`) lives in
- * the browser. Three mechanisms, in order of precedence, all persisted to
- * order meta so events can be reprocessed and debugged:
+ * completes on the server, but a guest's identity (`anon_...`) lives only in
+ * the browser. Three mechanisms, in order of precedence:
  *
- *   1. The checkout bridge: JS reads kilden.getDistinctId() into a hidden
- *      checkout field (classic) or a session-backed REST call (blocks).
- *   2. Logged-in customer → WP user id.
+ *   1. Logged-in customer → WP user id, resolved here rather than taken from
+ *      the browser. Same value either way (the identity endpoint hands the
+ *      browser the id from this same filter), minus the trust.
+ *   2. The checkout bridge, for guests: JS reads kilden.getDistinctId() into
+ *      a hidden field (classic) or a session-backed REST call (blocks). It
+ *      may only ever carry an anonymous id — everything it says is untrusted
+ *      input that would otherwise reach the platform as verified fact.
  *   3. Last resort: a deterministic per-order anonymous id, documented.
+ *
+ * The bridged id is persisted to order meta so events can be reprocessed and
+ * debugged, but it is re-checked on every read: meta may predate the rule.
  */
 
 if (!defined('ABSPATH')) {
@@ -130,9 +136,14 @@ class Kilden_WooCommerce
     }
 
     /**
-     * Precedence: order meta (the bridge) → customer user id → documented
-     * last-resort anonymous id. The meta read comes first ALWAYS: it is what
-     * makes events reprocessable.
+     * Precedence: authenticated customer → the bridged id (guests only, and
+     * only in the anonymous shape) → documented last-resort anonymous id.
+     *
+     * The customer comes first ALWAYS. The bridged id arrives in a checkout
+     * form field, and this event goes out server-side with the secret key,
+     * which the platform reads as authenticated fact — so letting the browser
+     * outrank the session lets a buyer name someone else and land their
+     * revenue on that person. It used to.
      *
      * @param WC_Order $order
      */

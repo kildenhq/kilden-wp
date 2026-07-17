@@ -121,4 +121,55 @@ final class IdentityBridgeTest extends TestCase
         $this->assertSame('anon_019f6db7-7941-7290-93fe-66e1e112e2b2', (string) $order->get_meta('_kilden_distinct_id'));
         unset($_POST['kilden_distinct_id']);
     }
+
+    // --- blocks checkout: the id travels through the Woo session ---
+
+    public function testBlocksBridgeStoresTheSessionAnonymousId(): void
+    {
+        $order = $this->order(array('id' => 3010));
+        WC()->session = new Kilden_Fake_WC_Session();
+        WC()->session->set('kilden_distinct_id', 'anon_019f6db7-7941-7290-93fe-66e1e112e2b2');
+
+        Kilden_WooCommerce::persist_distinct_id_blocks($order);
+
+        $this->assertSame('anon_019f6db7-7941-7290-93fe-66e1e112e2b2', (string) $order->get_meta('_kilden_distinct_id'));
+    }
+
+    public function testBlocksBridgeRefusesANonAnonymousSessionValue(): void
+    {
+        $order = $this->order(array('id' => 3011));
+        WC()->session = new Kilden_Fake_WC_Session();
+        WC()->session->set('kilden_distinct_id', 'victim_ceo_user_1');
+
+        Kilden_WooCommerce::persist_distinct_id_blocks($order);
+
+        $this->assertSame('', (string) $order->get_meta('_kilden_distinct_id'));
+    }
+
+    public function testBridgeRouteRejectsAnIdThatIsNotAnonymous(): void
+    {
+        $response = Kilden_WooCommerce::handle_bridge(new Kilden_Fake_Request(array('distinct_id' => 'victim_ceo_user_1')));
+
+        $this->assertSame(400, $response->status);
+        $this->assertSame(array('status' => 'ignored'), $response->data);
+    }
+
+    public function testBridgeRouteAsksWooToBootTheSessionItNeeds(): void
+    {
+        // WooCommerce boots no session on a custom REST route, so without
+        // this the route wrote to nothing — and still answered 200, which is
+        // how the default checkout lost every guest's id in silence.
+        $this->assertNull(WC()->session);
+
+        $response = Kilden_WooCommerce::handle_bridge(
+            new Kilden_Fake_Request(array('distinct_id' => 'anon_019f6db7-7941-7290-93fe-66e1e112e2b2'))
+        );
+
+        $this->assertSame(1, $GLOBALS['kilden_test']['wc_load_cart_calls']);
+        $this->assertSame(200, $response->status);
+        $this->assertSame(
+            'anon_019f6db7-7941-7290-93fe-66e1e112e2b2',
+            WC()->session->get('kilden_distinct_id')
+        );
+    }
 }
