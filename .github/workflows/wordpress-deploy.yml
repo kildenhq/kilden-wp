@@ -23,6 +23,7 @@ jobs:
   deploy:
     if: ${{ false }}  # flip after wordpress.org approval — see header comment
     runs-on: kilden-runners
+    container: buildpack-deps:jammy
     steps:
       - uses: actions/checkout@v4
       - uses: 10up/action-wordpress-plugin-deploy@stable
