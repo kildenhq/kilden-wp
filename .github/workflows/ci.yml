@@ -51,6 +51,11 @@ jobs:
         run: |
           sed -i 's|"../kilden-sdk-php"|"kilden-sdk-php"|' composer.json
           composer update --no-interaction --no-progress
+      # checkout marks the workspace safe only for its own run, so git's
+      # ownership check trips here inside the container and it stops seeing a
+      # repository at all ("Not a git repository", exit 129).
+      - name: trust the workspace
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: vendored core is reproducible
         run: |
           php bin/build-vendor.php kilden-sdk-php
