@@ -1,3 +1,7 @@
+# Every job runs in an ubuntu container: setup-php/python/ruby only ship
+# prebuilt toolchains for GitHub's ubuntu images and fail outright on the lab
+# runners, which are Debian 13. buildpack-deps carries the git + build tools
+# those actions expect on top of it.
 name: ci
 
 on:
@@ -7,7 +11,8 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: kilden-runners
+    container: buildpack-deps:jammy
     strategy:
       matrix:
         php: ["7.4", "8.0", "8.3"]
@@ -23,7 +28,8 @@ jobs:
           echo "lint clean"
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: kilden-runners
+    container: buildpack-deps:jammy
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
@@ -45,6 +51,11 @@ jobs:
         run: |
           sed -i 's|"../kilden-sdk-php"|"kilden-sdk-php"|' composer.json
           composer update --no-interaction --no-progress
+      # checkout marks the workspace safe only for its own run, so git's
+      # ownership check trips here inside the container and it stops seeing a
+      # repository at all ("Not a git repository", exit 129).
+      - name: trust the workspace
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: vendored core is reproducible
         run: |
           php bin/build-vendor.php kilden-sdk-php
